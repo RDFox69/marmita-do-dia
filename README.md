@@ -63,6 +63,10 @@ Os testes usam o executor nativo `node:test` e cobrem cálculo e limites, adicio
 
 Para seguir o ciclo TDD ao alterar uma regra: escreva primeiro um caso que falha (`npm test`), implemente a menor alteração para fazê-lo passar e rode os testes novamente; depois refatore mantendo a suíte verde. A suíte cobre os comportamentos centrais, mas os novos cenários devem ser acrescentados junto com cada regra alterada.
 
+## Publicação no GitHub Pages
+
+O workflow [Deploy to GitHub Pages](.github/workflows/pages.yml) testa e publica o app em pushes para `main` e para a branch de publicação, além de permitir execução manual. O endereço do projeto no Pages usa o caminho `/marmita-do-dia/`; localmente, o Vite continua usando a raiz do servidor.
+
 ## Uso de Inteligência Artificial
 
 O GitHub Copilot apoiou a conversão do briefing em módulos de interface, regras de pedidos e caixa, testes automatizados e documentação de descoberta e planejamento.
