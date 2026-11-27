@@ -1,38 +1,35 @@
 import { createIcons, icons } from "lucide";
-import { advanceOrderStatus, calculateOrderTotal, createOrder, getDailySummary, getNextOrderStatus, localDateKey, ORDER_STATUSES } from "./domain/orders.js";
-import { loadOrders, saveOrders } from "./domain/storage.js";
+import { advanceOrderStatus, calculateOrderTotal, createOrder, getDailySummary, getNextOrderStatus, ORDER_STATUSES } from "./domain/orders.js";
+import { extras, getExtras, getProduct, products } from "./domain/menu.js";
+import { fetchOrders, insertOrder, updateOrder } from "./services/orders.js";
+import { apiRequest } from "./services/api.js";
 import { formatCurrency, formatTime, escapeHtml } from "./ui/helpers.js";
 import "../css/app.css";
 
 const app = document.getElementById("app");
-const products = [
-  { id: "frango", name: "Frango grelhado", priceCents: 2490 },
-  { id: "carne", name: "Carne de panela", priceCents: 2690 },
-  { id: "vegetariana", name: "Marmita vegetariana", priceCents: 2390 },
-  { id: "executiva", name: "Marmita executiva", priceCents: 2990 },
-];
-const extras = [
-  { id: "farofa", name: "Farofa", priceCents: 300 },
-  { id: "ovo", name: "Ovo", priceCents: 250 },
-  { id: "bacon", name: "Bacon", priceCents: 400 },
-];
-const navigation = [
+const operatorNavigation = [
   { route: "#inicio", label: "Visão geral", icon: "layout-dashboard" },
   { route: "#pedidos", label: "Pedidos e cozinha", icon: "chef-hat" },
   { route: "#clientes", label: "Clientes", icon: "users" },
   { route: "#caixa", label: "Fechamento de caixa", icon: "wallet-cards" },
 ];
+const customerNavigation = [
+  { route: "#pedidos", label: "Meus pedidos", icon: "clipboard-list" },
+  { route: "#novo-pedido", label: "Novo pedido", icon: "plus" },
+];
 const statusNames = Object.fromEntries(ORDER_STATUSES.map(({ id, label }) => [id, label]));
-let orders;
+let orders = [];
+let session = null;
+let profile = null;
+let authReady = false;
+let authAudience = "customer";
+let authMode = "login";
 let flashMessage = "";
 let flashType = "success";
-
-try {
-  orders = loadOrders();
-} catch (error) {
-  app.innerHTML = `<section class="storage-error"><span class="brand-mark">M</span><h1>Não foi possível abrir seus pedidos</h1><p>${escapeHtml(error.message)}</p><p>Os dados salvos não foram alterados. Confira o armazenamento deste navegador e tente novamente.</p></section>`;
-  throw error;
-}
+let contextLoading = false;
+let operatorAccessPending = false;
+let orderRefreshTimer = null;
+let isRefreshingOrders = false;
 
 function routeInfo() {
   const [route, query = ""] = (location.hash || "#inicio").split("?");
@@ -67,6 +64,10 @@ function currentDateLabel() {
 }
 
 function shell(content, activeRoute) {
+  const navigation = profile.role === "operator" ? operatorNavigation : customerNavigation;
+  const displayName = profile.full_name || profile.email;
+  const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  const isOperator = profile.role === "operator";
   return `
     <div class="app-shell">
       <aside class="sidebar">
@@ -74,22 +75,46 @@ function shell(content, activeRoute) {
           <span class="brand-mark"><i data-lucide="soup"></i></span>
           <span><strong>Marmita em Dia</strong><small>Rotina mais leve</small></span>
         </a>
-        <p class="nav-caption">MENU PRINCIPAL</p>
+        <p class="nav-caption">${isOperator ? "COZINHA" : "ÁREA DO CLIENTE"}</p>
         <nav class="side-nav" aria-label="Navegação principal">
           ${navigation.map(({ route, label, icon }) => `<a href="${route}" class="nav-link ${route === activeRoute ? "active" : ""}"><i data-lucide="${icon}"></i><span>${label}</span>${route === "#pedidos" && orders.filter((order) => order.status !== "completed").length ? `<small class="nav-count">${orders.filter((order) => order.status !== "completed").length}</small>` : ""}</a>`).join("")}
         </nav>
-        <div class="sidebar-note"><span class="note-icon"><i data-lucide="heart-handshake"></i></span><strong>Feito para o seu dia a dia</strong><p>Seus pedidos ficam salvos neste navegador.</p></div>
-        <div class="sidebar-profile"><span class="profile-avatar">DM</span><span><strong>Minha cozinha</strong><small>Pequeno negócio, grandes sabores</small></span></div>
+        <div class="sidebar-note"><span class="note-icon"><i data-lucide="${isOperator ? "heart-handshake" : "shield-check"}"></i></span><strong>${isOperator ? "Pedidos em um só lugar" : "Acompanhe seu pedido"}</strong><p>${isOperator ? "Atualizações da cozinha aparecem para o cliente." : "Veja o andamento e a previsão por aqui."}</p></div>
+        <div class="sidebar-profile"><span class="profile-avatar">${escapeHtml(initials)}</span><span class="profile-identity"><strong>${escapeHtml(displayName)}</strong><small>${isOperator ? "Equipe da cozinha" : "Cliente"}</small></span><button class="sign-out-button" type="button" data-action="sign-out" aria-label="Sair da conta" title="Sair"><i data-lucide="log-out"></i></button></div>
       </aside>
       <div class="app-main">
-        <header class="topbar"><div class="mobile-brand"><span class="brand-mark"><i data-lucide="soup"></i></span><strong>Marmita em Dia</strong></div><div class="topbar-date"><i data-lucide="calendar-days"></i><span>${currentDateLabel()}</span></div><a class="button button-primary topbar-action" href="#novo-pedido"><i data-lucide="plus"></i><span>Novo pedido</span></a></header>
+        <header class="topbar"><div class="mobile-brand"><span class="brand-mark"><i data-lucide="soup"></i></span><strong>Marmita em Dia</strong></div><div class="topbar-date"><i data-lucide="calendar-days"></i><span>${currentDateLabel()}</span></div>${isOperator ? `<a class="button button-primary topbar-action" href="#novo-pedido"><i data-lucide="plus"></i><span>Novo pedido</span></a>` : `<span class="topbar-account">${escapeHtml(displayName)}</span>`}<button class="topbar-signout" type="button" data-action="sign-out"><i data-lucide="log-out"></i><span>Sair</span></button></header>
         ${flashMessage ? `<div class="toast toast-${flashType}" role="status">${escapeHtml(flashMessage)}<button type="button" class="toast-close" aria-label="Fechar aviso" data-action="clear-flash">×</button></div>` : ""}
         <main class="content">${content}</main>
       </div>
-      <nav class="mobile-nav" aria-label="Navegação principal">
+      <nav class="mobile-nav ${isOperator ? "operator-mobile-nav" : "customer-mobile-nav"}" aria-label="Navegação principal">
         ${navigation.map(({ route, label, icon }) => `<a href="${route}" class="${route === activeRoute ? "active" : ""}" aria-label="${label}"><i data-lucide="${icon}"></i><span>${label === "Visão geral" ? "Início" : label === "Pedidos e cozinha" ? "Pedidos" : label === "Fechamento de caixa" ? "Caixa" : label}</span></a>`).join("")}
       </nav>
     </div>`;
+}
+
+function serverUnavailablePage(error) {
+  return `<section class="auth-page"><div class="auth-card config-card"><span class="brand-mark"><i data-lucide="server-off"></i></span><p class="eyebrow">SERVIDOR INDISPONÍVEL</p><h1>Não foi possível conectar</h1><p class="auth-description">${escapeHtml(error.message || "O servidor não respondeu.")}</p><div class="auth-notice"><strong>Inicie o servidor Python para usar o sistema.</strong><span>Consulte o README para instalar as dependências e executar a aplicação Flask.</span></div><button class="button button-outline" type="button" data-action="retry-server">Tentar novamente</button></div></section>`;
+}
+
+function authPage() {
+  const isSignup = authMode === "signup";
+  return `<section class="auth-page">
+    <div class="auth-intro"><a class="brand auth-brand" href="#login"><span class="brand-mark"><i data-lucide="soup"></i></span><span><strong>Marmita em Dia</strong><small>Rotina mais leve</small></span></a><p class="eyebrow">PEDIDO SEM COMPLICAÇÃO</p><h1>Comida caseira, com tudo em ordem.</h1><p>Peça sua marmita e acompanhe o preparo. A equipe organiza cada pedido em uma fila única.</p><div class="auth-benefits"><span><i data-lucide="clipboard-check"></i>Pedido organizado</span><span><i data-lucide="timer"></i>Previsão de preparo</span><span><i data-lucide="map-pin"></i>Entrega ou retirada</span></div></div>
+    <div class="auth-card">
+      <div class="auth-audience" aria-label="Tipo de acesso"><button type="button" data-action="auth-audience" data-audience="customer" class="${authAudience === "customer" ? "active" : ""}">Sou cliente</button><button type="button" data-action="auth-audience" data-audience="operator" class="${authAudience === "operator" ? "active" : ""}">Sou da equipe</button></div>
+      <p class="eyebrow">${authAudience === "operator" ? "ACESSO DA COZINHA" : "ÁREA DO CLIENTE"}</p><h2>${authAudience === "operator" ? isSignup ? "Solicitar acesso à cozinha" : "Entrar na cozinha" : isSignup ? "Crie sua conta" : "Acesse sua conta"}</h2><p class="auth-description">${authAudience === "operator" ? isSignup ? "Crie uma conta e peça ao responsável para habilitar seu acesso à equipe." : "Entre para acompanhar e organizar todos os pedidos." : isSignup ? "Cadastre-se uma vez para pedir e acompanhar o preparo." : "Entre para fazer um pedido ou acompanhar sua entrega."}</p>
+      ${authAudience === "customer" ? `<div class="auth-mode"><button type="button" data-action="auth-mode" data-mode="login" class="${authMode === "login" ? "active" : ""}">Entrar</button><button type="button" data-action="auth-mode" data-mode="signup" class="${authMode === "signup" ? "active" : ""}">Criar conta</button></div>` : `<button class="auth-request-link" type="button" data-action="auth-mode" data-mode="${isSignup ? "login" : "signup"}">${isSignup ? "Já tem acesso? Entrar" : "Precisa de acesso? Solicitar conta"}</button>`}
+      ${flashMessage ? `<div class="auth-error" role="alert">${escapeHtml(flashMessage)}</div>` : ""}
+      <form class="auth-form" id="auth-form">
+        ${isSignup ? `<label class="field"><span>Seu nome <b>*</b></span><input name="fullName" autocomplete="name" required maxlength="100" placeholder="Ex.: Ana Souza"></label><label class="field"><span>Telefone / WhatsApp <b>*</b></span><input name="phone" type="tel" autocomplete="tel" required maxlength="30" placeholder="(11) 99999-9999"></label>` : ""}
+        <label class="field"><span>E-mail <b>*</b></span><input name="email" type="email" autocomplete="email" required maxlength="254" placeholder="voce@email.com"></label>
+        <label class="field"><span>Senha <b>*</b></span><input name="password" type="password" autocomplete="${isSignup ? "new-password" : "current-password"}" minlength="8" required placeholder="${isSignup ? "Pelo menos 8 caracteres" : "Sua senha"}"></label>
+        <button class="button button-primary auth-submit" type="submit">${isSignup ? authAudience === "operator" ? "Criar conta e solicitar acesso" : "Criar conta de cliente" : "Entrar"}<i data-lucide="arrow-right"></i></button>
+      </form>
+      <p class="auth-footnote">${authAudience === "operator" ? "A solicitação não libera acesso automaticamente. Somente a administração pode autorizar o perfil da equipe." : "Seus pedidos ficam salvos com segurança e podem ser acessados em seus dispositivos."}</p>
+    </div>
+  </section>`;
 }
 
 function pageHeading(eyebrow, title, description, action = "") {
@@ -100,7 +125,17 @@ function metricCard(icon, label, value, detail, tone = "green") {
   return `<article class="metric-card"><span class="metric-icon tone-${tone}"><i data-lucide="${icon}"></i></span><div><span class="metric-label">${label}</span><strong class="metric-value">${value}</strong><small>${detail}</small></div></article>`;
 }
 
-function orderCard(order, compact = false) {
+function formatETA(order) {
+  if (order.status === "completed") return "Pedido concluído";
+  if (order.status === "ready" || order.status === "delivering") return order.status === "ready" ? "Pedido pronto para retirada ou envio" : "Pedido a caminho";
+  const eta = new Date(order.estimatedReadyAt);
+  if (Number.isNaN(eta.getTime())) return "A equipe está preparando seu pedido";
+  const minutes = Math.max(0, Math.ceil((eta.getTime() - Date.now()) / 60000));
+  const time = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(eta);
+  return minutes === 0 ? `Previsão: agora · ${time}` : `Previsão em cerca de ${minutes} min · ${time}`;
+}
+
+function orderCard(order, compact = false, customerView = false) {
   const customizations = [...order.customizations, ...order.extras.map(({ name }) => `Adicional: ${name}`)];
   const nextStatus = getNextOrderStatus(order);
   return `<article class="order-card ${compact ? "order-card-compact" : ""}">
@@ -110,11 +145,13 @@ function orderCard(order, compact = false) {
     ${customizations.length ? `<div class="order-tags">${customizations.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>` : ""}
     ${order.notes ? `<p class="order-note"><i data-lucide="message-square-text"></i>${escapeHtml(order.notes)}</p>` : ""}
     ${!compact && order.fulfillment === "delivery" && order.customer.address ? `<p class="order-address"><i data-lucide="map-pin"></i>${escapeHtml(order.customer.address)}</p>` : ""}
+    ${!compact ? `<div class="order-eta"><i data-lucide="timer"></i><span>${escapeHtml(formatETA(order))}</span></div>` : ""}
     <div class="order-card-bottom"><strong>${formatCurrency(order.totalCents)}</strong><span class="payment-indicator ${order.paymentStatus}">${order.paymentStatus === "paid" ? "Pago" : "Pendente"} · ${order.paymentMethod === "pix" ? "Pix" : order.paymentMethod === "cash" ? "Dinheiro" : "Cartão"}</span></div>
-    <div class="order-card-actions">
+    ${customerView ? "" : `<div class="order-card-actions">
       ${nextStatus ? `<button class="button button-soft" type="button" data-action="advance-status" data-id="${escapeAttr(order.id)}"><i data-lucide="arrow-right"></i>${nextStatus.action}</button>` : `<span class="completed-label"><i data-lucide="circle-check"></i>Pedido concluído</span>`}
       <button class="text-action" type="button" data-action="toggle-payment" data-id="${escapeAttr(order.id)}">${order.paymentStatus === "paid" ? "Marcar pendente" : "Marcar como pago"}</button>
-    </div>
+      ${["waiting", "preparing"].includes(order.status) ? `<button class="text-action" type="button" data-action="extend-eta" data-id="${escapeAttr(order.id)}">Ajustar previsão +15 min</button>` : ""}
+    </div>`}
   </article>`;
 }
 
@@ -138,19 +175,29 @@ function dashboard() {
     <section class="tip-banner"><span><i data-lucide="sparkles"></i></span><div><strong>Uma coisa de cada vez</strong><p>Seus pedidos, personalizações e pagamentos estão organizados em um só lugar.</p></div><a href="#pedidos" aria-label="Ver pedidos"><i data-lucide="arrow-right"></i></a></section>`;
 }
 
+function customerOrdersPage() {
+  const myOrders = [...orders].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return `${pageHeading("ACOMPANHE SEU PEDIDO", "Meus pedidos", "Veja o andamento e a previsão atualizada pela equipe da cozinha.", `<a class="button button-primary heading-action" href="#novo-pedido"><i data-lucide="plus"></i>Fazer pedido</a>`)}
+    ${myOrders.length ? `<section class="customer-orders-list">${myOrders.map((order) => orderCard(order, false, true)).join("")}</section>` : `<section class="panel empty-state"><span class="empty-icon"><i data-lucide="clipboard-plus"></i></span><strong>Você ainda não fez um pedido</strong><p>Escolha sua marmita e acompanhe o preparo por aqui.</p><a class="button button-primary" href="#novo-pedido"><i data-lucide="plus"></i>Fazer primeiro pedido</a></section>`}`;
+}
+
 function kitchenQueue() {
   const summary = getDailySummary(orders);
-  const todayOrders = orders.filter((order) => order.dateKey === summary.dateKey).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const filter = routeInfo().params.get("filtro") || "active";
+  const visibleOrders = orders
+    .filter((order) => filter === "all" || (filter === "today" ? order.dateKey === summary.dateKey : order.status !== "completed"))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const columns = ORDER_STATUSES.map(({ id, label, icon }) => {
-    const items = todayOrders.filter((order) => order.status === id);
+    const items = visibleOrders.filter((order) => order.status === id);
     return `<section class="queue-column"><div class="queue-heading"><span class="queue-stage-icon stage-dot-${id}"><i data-lucide="${icon}"></i></span><div><h2>${label}</h2><small>${items.length} ${items.length === 1 ? "pedido" : "pedidos"}</small></div><span class="queue-count">${items.length}</span></div><div class="queue-cards">${items.length ? items.map((order) => orderCard(order)).join("") : `<div class="queue-empty">Nenhum pedido nesta etapa</div>`}</div></section>`;
   }).join("");
   return `${pageHeading("ORGANIZAÇÃO DA COZINHA", "Fila de pedidos", "Veja o que precisa ser preparado agora e avance cada pedido com um toque.", `<a class="button button-primary heading-action" href="#novo-pedido"><i data-lucide="plus"></i>Registrar pedido</a>`)}
-    <div class="queue-help"><i data-lucide="info"></i><span>Os pedidos de hoje aparecem por etapa. Use o botão em cada cartão para avançar na fila.</span><span class="queue-date">${currentDateLabel()}</span></div>
+    <div class="queue-help"><i data-lucide="info"></i><span>Pedidos atualizados automaticamente a cada 15 segundos. Use o botão em cada cartão para avançar na fila.</span><label class="queue-filter">Mostrar <select id="queue-filter"><option value="active" ${filter === "active" ? "selected" : ""}>Pedidos ativos</option><option value="all" ${filter === "all" ? "selected" : ""}>Todos os pedidos</option><option value="today" ${filter === "today" ? "selected" : ""}>Somente hoje</option></select></label></div>
     <div class="queue-board">${columns}</div>`;
 }
 
 function orderForm(customerId = "") {
+  if (profile.role === "customer") return customerOrderForm();
   const customers = getCustomers();
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
   const productOptions = products.map(({ id, name, priceCents }) => `<option value="${id}">${name} · ${formatCurrency(priceCents)}</option>`).join("");
@@ -174,6 +221,29 @@ function orderForm(customerId = "") {
       </section>
       <aside class="form-total"><div><span>Total do pedido</span><small id="total-description">1 marmita · sem adicionais</small></div><strong id="order-total">${formatCurrency(products[0].priceCents)}</strong></aside>
       <div class="form-actions"><a class="button button-outline" href="#pedidos">Cancelar</a><button class="button button-primary submit-order" type="submit"><i data-lucide="check"></i>Salvar pedido</button></div>
+    </form>`;
+}
+
+function customerOrderForm() {
+  const previousAddress = orders.find((order) => order.customer.address)?.customer.address || "";
+  const productOptions = products.map(({ id, name, priceCents }) => `<option value="${id}">${name} · ${formatCurrency(priceCents)}</option>`).join("");
+  const extrasMarkup = extras.map(({ id, name, priceCents }) => `<label class="check-option"><input type="checkbox" name="extras" value="${id}"><span class="check-box"></span><span>${name}</span><small>+ ${formatCurrency(priceCents)}</small></label>`).join("");
+  return `${pageHeading("NOVO PEDIDO", "Peça sua marmita", "Escolha o prato e conte à cozinha como você prefere.", "")}
+    <form class="order-form customer-order-form" id="order-form">
+      <section class="form-section"><div class="form-section-heading"><span class="form-step">1</span><div><h2>Quem vai receber?</h2><p>Usaremos os dados da sua conta para identificar o pedido.</p></div></div><div class="account-details"><strong>${escapeHtml(profile.full_name)}</strong><span>${escapeHtml(profile.phone)}</span></div></section>
+      <section class="form-section"><div class="form-section-heading"><span class="form-step">2</span><div><h2>Escolha sua marmita</h2><p>Personalizações e adicionais serão enviados para a cozinha.</p></div></div>
+        <div class="form-grid"><label class="field"><span>Tipo de marmita <b>*</b></span><select name="product" id="product-select" required>${productOptions}</select></label><label class="field"><span>Quantidade <b>*</b></span><input type="number" name="quantity" id="quantity-input" min="1" max="30" value="1" required></label></div>
+        <fieldset class="choice-fieldset"><legend>Personalizações</legend><div class="check-grid"><label class="check-option"><input type="checkbox" name="customizations" value="Sem feijão"><span class="check-box"></span><span>Sem feijão</span></label><label class="check-option"><input type="checkbox" name="customizations" value="Sem salada"><span class="check-box"></span><span>Sem salada</span></label><label class="check-option"><input type="checkbox" name="customizations" value="Trocar salada por farofa"><span class="check-box"></span><span>Trocar salada por farofa</span></label></div></fieldset>
+        <fieldset class="choice-fieldset"><legend>Adicionar um acompanhamento</legend><div class="check-grid">${extrasMarkup}</div></fieldset>
+        <label class="field field-wide"><span>Observação para a cozinha <small>(opcional)</small></span><textarea name="notes" rows="2" maxlength="500" placeholder="Ex.: molho separado, pouca pimenta..."></textarea></label>
+      </section>
+      <section class="form-section"><div class="form-section-heading"><span class="form-step">3</span><div><h2>Entrega e pagamento</h2><p>A equipe verá a forma de recebimento escolhida.</p></div></div>
+        <fieldset class="choice-fieldset"><legend>Como vai receber?</legend><div class="segmented-options"><label><input type="radio" name="fulfillment" value="delivery" checked><span><i data-lucide="bike"></i>Entrega</span></label><label><input type="radio" name="fulfillment" value="pickup"><span><i data-lucide="store"></i>Retirada no local</span></label></div></fieldset>
+        <label class="field field-wide" id="address-field"><span>Endereço de entrega <b>*</b></span><input id="customer-address" name="customerAddress" value="${escapeAttr(previousAddress)}" maxlength="300" autocomplete="street-address" placeholder="Rua, número, bairro"></label>
+        <div class="form-grid payment-fields"><label class="field"><span>Forma de pagamento <b>*</b></span><select name="paymentMethod"><option value="pix">Pix</option><option value="cash">Dinheiro</option><option value="card">Cartão</option></select></label><div class="payment-pending-note"><i data-lucide="info"></i><span>O pagamento fica pendente até a equipe confirmar o recebimento.</span></div></div>
+      </section>
+      <aside class="form-total"><div><span>Total do pedido</span><small id="total-description">1 marmita · sem adicionais</small></div><strong id="order-total">${formatCurrency(products[0].priceCents)}</strong></aside>
+      <div class="form-actions"><a class="button button-outline" href="#pedidos">Cancelar</a><button class="button button-primary submit-order" type="submit"><i data-lucide="check"></i>Enviar pedido</button></div>
     </form>`;
 }
 
@@ -204,20 +274,59 @@ function cashPage() {
     </section>`;
 }
 
+function operatorApprovalPage() {
+  return `<section class="auth-page"><div class="auth-card config-card"><span class="brand-mark"><i data-lucide="shield-check"></i></span><p class="eyebrow">SOLICITAÇÃO RECEBIDA</p><h1>Aguardando autorização</h1><p class="auth-description">Sua conta foi criada, mas ainda não tem acesso aos pedidos da cozinha. Peça à pessoa responsável para aprovar seu perfil de equipe.</p><div class="auth-notice"><strong>O acesso da equipe é protegido.</strong><span>Somente a administração pode aprovar esta solicitação. Depois da aprovação, entre novamente pela opção “Sou da equipe”.</span></div><button class="button button-outline" type="button" data-action="sign-out">Sair da conta</button></div></section>`;
+}
+
 function render() {
+  if (!authReady) {
+    app.innerHTML = `<section class="auth-page"><div class="auth-card"><span class="brand-mark"><i data-lucide="soup"></i></span><h1>Carregando sua conta...</h1><p class="auth-description">Estamos verificando seu acesso com segurança.</p></div></section>`;
+    createIcons({ icons });
+    return;
+  }
+  if (!session) {
+    app.innerHTML = authPage();
+    createIcons({ icons });
+    bindAuthForm();
+    return;
+  }
+  if (contextLoading) {
+    app.innerHTML = `<section class="auth-page"><div class="auth-card"><span class="brand-mark"><i data-lucide="soup"></i></span><h1>Carregando seus pedidos...</h1><p class="auth-description">Só um instante.</p></div></section>`;
+    createIcons({ icons });
+    return;
+  }
+  if (!profile) {
+    app.innerHTML = `<section class="auth-page"><div class="auth-card"><span class="brand-mark"><i data-lucide="circle-alert"></i></span><h1>Não foi possível abrir sua conta</h1><p class="auth-error" role="alert">${escapeHtml(flashMessage || "Confira a configuração do projeto e tente novamente.")}</p><button class="button button-outline" type="button" data-action="sign-out">Sair da conta</button></div></section>`;
+    createIcons({ icons });
+    return;
+  }
+  if (operatorAccessPending && profile.role !== "operator") {
+    app.innerHTML = operatorApprovalPage();
+    createIcons({ icons });
+    return;
+  }
   const { route, params } = routeInfo();
-  const pages = {
+  const pages = profile.role === "operator" ? {
     "#inicio": dashboard,
     "#pedidos": kitchenQueue,
     "#clientes": customersPage,
     "#caixa": cashPage,
     "#novo-pedido": () => orderForm(params.get("cliente") || ""),
+  } : {
+    "#pedidos": customerOrdersPage,
+    "#novo-pedido": () => orderForm(),
   };
-  const activeRoute = route === "#novo-pedido" ? "#pedidos" : pages[route] ? route : "#inicio";
-  app.innerHTML = shell((pages[route] || dashboard)(), activeRoute);
+  const fallbackRoute = profile.role === "operator" ? "#inicio" : "#pedidos";
+  if (!pages[route]) {
+    location.hash = fallbackRoute;
+    return;
+  }
+  const activeRoute = route === "#novo-pedido" ? (profile.role === "operator" ? "#pedidos" : "#novo-pedido") : route;
+  app.innerHTML = shell(pages[route](), activeRoute);
   createIcons({ icons });
   if (route === "#novo-pedido") bindOrderForm();
-  if (route === "#clientes") bindCustomerSearch();
+  if (profile.role === "operator" && route === "#clientes") bindCustomerSearch();
+  if (profile.role === "operator" && route === "#pedidos") bindQueueFilter();
 }
 
 function bindOrderForm() {
@@ -232,12 +341,17 @@ function bindOrderForm() {
   };
   const updateTotal = () => {
     const data = new FormData(form);
-    const product = products.find(({ id }) => id === data.get("product"));
     const quantity = Number(data.get("quantity"));
-    const chosenExtras = extras.filter(({ id }) => data.getAll("extras").includes(id));
-    const total = calculateOrderTotal({ unitPriceCents: product.priceCents, quantity, extras: chosenExtras });
-    document.getElementById("order-total").textContent = formatCurrency(total);
-    document.getElementById("total-description").textContent = `${quantity} ${quantity === 1 ? "marmita" : "marmitas"} · ${chosenExtras.length ? `${chosenExtras.length} adicional(is)` : "sem adicionais"}`;
+    try {
+      const product = getProduct(data.get("product"));
+      const chosenExtras = getExtras(data.getAll("extras"));
+      const total = calculateOrderTotal({ unitPriceCents: product.priceCents, quantity, extras: chosenExtras });
+      document.getElementById("order-total").textContent = formatCurrency(total);
+      document.getElementById("total-description").textContent = `${quantity} ${quantity === 1 ? "marmita" : "marmitas"} · ${chosenExtras.length ? `${chosenExtras.length} adicional(is)` : "sem adicionais"}`;
+    } catch (error) {
+      document.getElementById("order-total").textContent = "—";
+      document.getElementById("total-description").textContent = error.message;
+    }
   };
   form.addEventListener("change", (event) => {
     if (event.target.name === "fulfillment") updateFulfillment();
@@ -252,41 +366,54 @@ function bindOrderForm() {
   form.addEventListener("input", updateTotal);
   updateFulfillment();
   updateTotal();
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!form.reportValidity()) return;
     const data = new FormData(form);
-    const product = products.find(({ id }) => id === data.get("product"));
-    const selectedExtras = extras.filter(({ id }) => data.getAll("extras").includes(id));
+    const submitButton = form.querySelector('[type="submit"]');
+    submitButton.disabled = true;
     try {
       const now = new Date();
       const order = createOrder({
-        number: orders.filter((item) => item.dateKey === localDateKey(now)).reduce((max, item) => Math.max(max, item.number), 0) + 1,
+        number: 1,
         customer: {
-          name: data.get("customerName").trim(),
-          phone: data.get("customerPhone").trim(),
+          id: profile.role === "customer" ? profile.id : "",
+          name: profile.role === "customer" ? profile.full_name : data.get("customerName").trim(),
+          phone: profile.role === "customer" ? profile.phone : data.get("customerPhone").trim(),
           address: data.get("fulfillment") === "delivery" ? data.get("customerAddress").trim() : "",
         },
-        product,
+        product: getProduct(data.get("product")),
         quantity: Number(data.get("quantity")),
         customizations: data.getAll("customizations"),
-        extras: selectedExtras,
-        notes: data.get("notes").trim(),
+        extras: getExtras(data.getAll("extras")),
+        notes: (data.get("notes") || "").trim(),
         fulfillment: data.get("fulfillment"),
         paymentMethod: data.get("paymentMethod"),
-        paymentStatus: data.get("paymentStatus"),
+        paymentStatus: profile.role === "customer" ? "pending" : data.get("paymentStatus"),
       }, now);
-      const nextOrders = [order, ...orders];
-      saveOrders(nextOrders);
-      orders = nextOrders;
-      flashMessage = `Pedido #${String(order.number).padStart(3, "0")} salvo. Bom trabalho!`;
+      const linkedCustomerId = profile.role === "operator" ? data.get("customerLookup") : null;
+      const savedOrder = await insertOrder(order, linkedCustomerId);
+      orders = [savedOrder, ...orders.filter(({ id }) => id !== savedOrder.id)];
+      flashMessage = profile.role === "customer"
+        ? `Pedido #${String(savedOrder.number).padStart(3, "0")} enviado. Acompanhe a previsão por aqui.`
+        : `Pedido #${String(savedOrder.number).padStart(3, "0")} salvo. Bom trabalho!`;
       flashType = "success";
       location.hash = "#pedidos";
     } catch (error) {
       flashMessage = error.message || "Não foi possível salvar. Tente novamente.";
       flashType = "error";
       render();
+    } finally {
+      if (submitButton.isConnected) submitButton.disabled = false;
     }
+  });
+}
+
+function bindQueueFilter() {
+  const filter = document.getElementById("queue-filter");
+  if (!filter) return;
+  filter.addEventListener("change", () => {
+    location.hash = `#pedidos?filtro=${encodeURIComponent(filter.value)}`;
   });
 }
 
@@ -306,11 +433,13 @@ function bindCustomerSearch() {
   });
 }
 
-function mutateOrder(id, updater) {
+async function mutateOrder(id, getChanges) {
   try {
-    const nextOrders = orders.map((order) => order.id === id ? updater(order) : order);
-    saveOrders(nextOrders);
-    orders = nextOrders;
+    const currentOrder = orders.find((order) => order.id === id);
+    if (!currentOrder) throw new Error("Esse pedido não está mais disponível.");
+    const changes = getChanges(currentOrder);
+    const savedOrder = await updateOrder(id, changes);
+    orders = orders.map((order) => order.id === id ? savedOrder : order);
     render();
   } catch (error) {
     flashMessage = error.message || "Não foi possível atualizar o pedido.";
@@ -319,9 +448,123 @@ function mutateOrder(id, updater) {
   }
 }
 
+async function applySession(nextProfile, pendingAccess = false) {
+  if (orderRefreshTimer) clearInterval(orderRefreshTimer);
+  orderRefreshTimer = null;
+  session = nextProfile ? { user: { id: nextProfile.id } } : null;
+  profile = nextProfile;
+  operatorAccessPending = Boolean(nextProfile && pendingAccess);
+  orders = [];
+  contextLoading = Boolean(nextProfile);
+  authReady = true;
+  if (!nextProfile) {
+    authMode = "login";
+    operatorAccessPending = false;
+    render();
+    return;
+  }
+  render();
+  try {
+    orders = await fetchOrders();
+    contextLoading = false;
+    flashMessage = "";
+    orderRefreshTimer = setInterval(() => {
+      const focusedField = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+      if (!document.hidden && !focusedField && routeInfo().route !== "#novo-pedido" && !isRefreshingOrders) void refreshOrders();
+    }, 15000);
+    if (!location.hash) location.hash = profile.role === "operator" ? "#inicio" : "#pedidos";
+    render();
+  } catch (error) {
+    contextLoading = false;
+    flashMessage = error.message || "Não foi possível abrir sua conta.";
+    flashType = "error";
+    profile = null;
+    render();
+  }
+}
+
+function bindAuthForm() {
+  const form = document.getElementById("auth-form");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    const button = form.querySelector('[type="submit"]');
+    const data = new FormData(form);
+    const email = String(data.get("email")).trim().toLowerCase();
+    const password = String(data.get("password"));
+    button.disabled = true;
+    flashMessage = "";
+    try {
+      if (authMode === "signup") {
+        const fullName = String(data.get("fullName")).trim();
+        const phone = String(data.get("phone")).trim();
+        if (password.length < 8) throw new Error("A senha precisa ter pelo menos 8 caracteres.");
+        const signup = await apiRequest("/api/auth/signup", {
+          method: "POST",
+          body: { email, password, fullName, phone, accountType: authAudience },
+        });
+        await applySession(signup.profile, signup.operatorAccessPending);
+        if (authAudience === "customer") location.hash = "#pedidos";
+        return;
+      }
+
+      const login = await apiRequest("/api/auth/login", { method: "POST", body: { email, password } });
+      await applySession(login.profile, login.operatorAccessPending);
+      if (!profile) throw new Error(flashMessage || "Não foi possível carregar o perfil desta conta.");
+      if (authAudience === "operator" && login.operatorAccessPending && profile.role === "customer") return;
+      if (profile?.role !== authAudience) {
+        await apiRequest("/api/auth/logout", { method: "POST" });
+        await apiRequest("/api/session");
+        await applySession(null);
+        throw new Error(authAudience === "operator"
+          ? "Esta conta não tem acesso de equipe. Peça ao responsável para habilitar o perfil."
+          : "Esta conta é de equipe. Selecione “Sou da equipe” para entrar.");
+      }
+      location.hash = profile.role === "operator" ? "#inicio" : "#pedidos";
+      render();
+    } catch (error) {
+      flashType = "error";
+      flashMessage = error.message || "Não foi possível acessar a conta. Confira os dados e tente novamente.";
+      render();
+    } finally {
+      if (button.isConnected) button.disabled = false;
+    }
+  });
+}
+
+async function refreshOrders() {
+  if (!profile || isRefreshingOrders) return;
+  isRefreshingOrders = true;
+  try {
+    const freshOrders = await fetchOrders();
+    if (JSON.stringify(freshOrders) !== JSON.stringify(orders)) {
+      orders = freshOrders;
+      render();
+    }
+  } catch (error) {
+    flashMessage = error.message || "Não foi possível atualizar os pedidos.";
+    flashType = "error";
+    render();
+  } finally {
+    isRefreshingOrders = false;
+  }
+}
+
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
   if (!button) return;
+  if (button.dataset.action === "auth-audience") {
+    authAudience = button.dataset.audience;
+    authMode = "login";
+    flashMessage = "";
+    render();
+  }
+  if (button.dataset.action === "auth-mode") {
+    authMode = button.dataset.mode;
+    flashMessage = "";
+    render();
+  }
   if (button.dataset.action === "clear-flash") {
     flashMessage = "";
     render();
@@ -329,12 +572,45 @@ document.addEventListener("click", (event) => {
   if (button.dataset.action === "advance-status") {
     const order = orders.find(({ id }) => id === button.dataset.id);
     if (!order) return;
-    mutateOrder(order.id, advanceOrderStatus);
+    mutateOrder(order.id, (current) => ({ status: advanceOrderStatus(current).status }));
   }
   if (button.dataset.action === "toggle-payment") {
-    mutateOrder(button.dataset.id, (order) => ({ ...order, paymentStatus: order.paymentStatus === "paid" ? "pending" : "paid" }));
+    mutateOrder(button.dataset.id, (order) => ({ paymentStatus: order.paymentStatus === "paid" ? "pending" : "paid" }));
+  }
+  if (button.dataset.action === "extend-eta") {
+    mutateOrder(button.dataset.id, (order) => {
+      const current = new Date(order.estimatedReadyAt).getTime();
+      const start = Number.isFinite(current) ? Math.max(Date.now(), current) : Date.now();
+      return { estimatedReadyAt: new Date(start + 15 * 60 * 1000).toISOString() };
+    });
+  }
+  if (button.dataset.action === "sign-out") {
+    void apiRequest("/api/auth/logout", { method: "POST" })
+      .then(() => apiRequest("/api/session"))
+      .then(() => applySession(null))
+      .catch((error) => {
+        flashMessage = error.message || "Não foi possível sair da conta.";
+        flashType = "error";
+        render();
+      });
+  }
+  if (button.dataset.action === "retry-server") {
+    void initializeApp();
   }
 });
 
 addEventListener("hashchange", render);
-render();
+
+async function initializeApp() {
+  try {
+    const currentSession = await apiRequest("/api/session");
+    await applySession(currentSession.profile, currentSession.operatorAccessPending);
+  } catch (error) {
+    authReady = true;
+    app.innerHTML = serverUnavailablePage(error);
+    flashType = "error";
+    createIcons({ icons });
+  }
+}
+
+void initializeApp();

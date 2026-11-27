@@ -1,5 +1,11 @@
 import { defineConfig } from "vite";
 
+const apiProxy = {
+  "/api": "http://127.0.0.1:5000",
+};
+
 export default defineConfig({
-  base: process.env.GITHUB_ACTIONS === "true" ? "/marmita-do-dia/" : "/",
+  base: "/",
+  server: { proxy: apiProxy },
+  preview: { proxy: apiProxy },
 });

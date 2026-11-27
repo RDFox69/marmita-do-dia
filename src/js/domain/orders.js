@@ -88,7 +88,7 @@ export function getNextOrderStatus(order) {
   if (order.status === "ready" && order.fulfillment === "pickup") {
     return { ...ORDER_STATUSES[index + 2], action: "Concluir retirada" };
   }
-  return ORDER_STATUSES[index + 1];
+  return { ...ORDER_STATUSES[index + 1], action: ORDER_STATUSES[index].action };
 }
 
 export function localDateKey(date) {

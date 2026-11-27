@@ -94,7 +94,10 @@ test("avança pedidos pela fila e mantém os concluídos estáveis", () => {
 test("retirada pode ser concluída direto da etapa pronto sem falsa etapa de entrega", () => {
   const pickup = { id: "4", status: "ready", fulfillment: "pickup" };
   assert.equal(getNextOrderStatus(pickup).id, "completed");
+  assert.equal(getNextOrderStatus(pickup).action, "Concluir retirada");
   assert.equal(advanceOrderStatus(pickup).status, "completed");
   const delivery = { id: "5", status: "ready", fulfillment: "delivery" };
   assert.equal(getNextOrderStatus(delivery).id, "delivering");
+  assert.equal(getNextOrderStatus({ status: "waiting" }).action, "Começar preparo");
+  assert.equal(getNextOrderStatus({ status: "preparing" }).action, "Marcar como pronto");
 });

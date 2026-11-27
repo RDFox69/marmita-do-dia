@@ -6,15 +6,15 @@
 
 Verificar se pessoas que recebem pedidos de comida conseguem registrar e acompanhar pedidos, recuperar um cliente recorrente e distinguir faturamento de pagamentos recebidos. Convide pelo menos duas pessoas que participem da operação de um pequeno negócio de alimentação. Obtenha consentimento, não use dados pessoais reais sem autorização e não ensine a navegação antes da primeira tentativa. O facilitador deve observar e anotar, sem sugerir onde clicar.
 
-**Materiais:** protótipo no navegador, computador ou celular/tablet disponível, este roteiro e caneta/notas. Duração sugerida: 20–30 minutos por sessão.
+**Materiais:** aplicação Flask em execução com banco de teste, computador ou celular/tablet disponível, este roteiro e caneta/notas. Duração sugerida: 20–30 minutos por sessão. Prepare previamente uma conta de equipe aprovada e pelo menos uma conta de cliente com pedidos fictícios; não use contas nem dados reais sem autorização.
 
 ## Abertura (ler para participante)
 
-“Estamos testando uma primeira versão de uma ferramenta para organizar pedidos de uma marmitaria. Não estamos testando você. Use como achar mais natural e fale o que estiver pensando. O protótipo guarda os pedidos só neste navegador e não se conecta ao WhatsApp. Você pode parar quando quiser.”
+“Estamos testando uma primeira versão de uma ferramenta para organizar pedidos de uma marmitaria. Não estamos testando você. Use como achar mais natural e fale o que estiver pensando. O sistema registra os pedidos de teste no servidor da aplicação e não se conecta ao WhatsApp. Você pode parar quando quiser.”
 
 ## Cenários e tarefas
 
-### Pessoa participante 1 — pedido personalizado e caixa
+### Pessoa participante 1 — pedido personalizado e caixa (perfil de equipe)
 
 1. Registre um pedido fictício para **Ana Souza**, telefone **(11) 99999-1001**, entrega em **Rua das Flores, 25, Centro**.
 2. Escolha **Frango grelhado**, quantidade **2**, marque **Sem feijão** e adicione **Farofa**. Escreva “molho separado” nas observações.
@@ -22,12 +22,13 @@ Verificar se pessoas que recebem pedidos de comida conseguem registrar e acompan
 4. Encontre o pedido na fila e avance uma etapa. Diga o que espera que aconteça a seguir.
 5. Abra o fechamento de caixa e explique qual valor está faturado e qual foi recebido.
 
-### Pessoa participante 2 — retorno, endereço e retirada
+### Pessoa participante 2 — retorno, endereço e acompanhamento (perfil de cliente)
 
-1. Registre um pedido fictício para **Bia Costa**, telefone **(11) 99999-1002**, entrega em **Av. das Palmeiras, 80, Vila Nova**. Escolha **Marmita vegetariana**, marque **Sem salada**, pagamento **dinheiro** e indique **pago**.
-2. Inicie outro pedido para Bia, usando a busca de cliente recorrente. Confirme se o telefone/endereço ajudam; mude para **retirada no local**, selecione **Marmita executiva**, quantidade **1**, pagamento **cartão** e ainda **não pago**.
-3. Encontre ambos os pedidos no caixa e explique por que faturamento e recebido são diferentes.
-4. Na fila, localize as instruções de personalização e diga se estão fáceis de perceber.
+1. Crie uma conta de teste e solicite uma marmita para entrega. Escolha **Marmita vegetariana**, marque **Sem salada**, selecione **dinheiro** e envie o pedido.
+2. Na área “Meus pedidos”, localize o pedido e explique o que entende pela etapa e pela previsão.
+3. Faça outro pedido, confira se o endereço anterior foi recuperado e mude para **retirada no local**, **Marmita executiva**, pagamento **cartão**.
+4. Após a equipe avançar o pedido e confirmar o pagamento, atualize a página e diga se o andamento está claro.
+5. Se o tempo permitir, tente abrir a página de outro cliente e explique o que esperava ver.
 
 ## O que observar
 
