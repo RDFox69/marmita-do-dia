@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="760" viewBox="0 0 1180 760" role="img" aria-labelledby="title description">
+  <title id="title">Esboços das telas do Marmita em Dia</title>
+  <desc id="description">Wireframes esquemáticos da visão geral, cadastro de pedido, fila de cozinha e fechamento de caixa.</desc>
+  <rect width="1180" height="760" fill="#f3f5f1"/>
+  <text x="40" y="46" fill="#26332c" font-family="Arial,sans-serif" font-size="24" font-weight="700">Marmita em Dia · esboços de interface</text>
+  <text x="40" y="72" fill="#718078" font-family="Arial,sans-serif" font-size="13">Esquema conceitual com conteúdo ilustrativo (não são dados ou resultados de participantes).</text>
+  <g font-family="Arial,sans-serif">
+    <rect x="40" y="105" width="530" height="285" rx="14" fill="#fff" stroke="#dfe5df"/>
+    <text x="60" y="135" fill="#2f7258" font-size="11" font-weight="700">01 · VISÃO GERAL</text>
+    <rect x="60" y="151" width="490" height="42" rx="8" fill="#f6f8f5"/>
+    <text x="76" y="177" fill="#26332c" font-size="17" font-weight="700">Bom dia, Dona Marta</text>
+    <rect x="60" y="207" width="113" height="68" rx="8" fill="#fff" stroke="#e5e9e3"/>
+    <rect x="184" y="207" width="113" height="68" rx="8" fill="#fff" stroke="#e5e9e3"/>
+    <rect x="308" y="207" width="113" height="68" rx="8" fill="#fff" stroke="#e5e9e3"/>
+    <rect x="432" y="207" width="118" height="68" rx="8" fill="#fff" stroke="#e5e9e3"/>
+    <text x="72" y="229" fill="#718078" font-size="9">PEDIDOS DE HOJE</text><text x="72" y="257" fill="#26332c" font-size="19" font-weight="700">12</text>
+    <text x="196" y="229" fill="#718078" font-size="9">EM ANDAMENTO</text><text x="196" y="257" fill="#26332c" font-size="19" font-weight="700">5</text>
+    <text x="320" y="229" fill="#718078" font-size="9">FATURAMENTO</text><text x="320" y="257" fill="#26332c" font-size="19" font-weight="700">R$ 320</text>
+    <text x="444" y="229" fill="#718078" font-size="9">PENDENTE</text><text x="444" y="257" fill="#26332c" font-size="19" font-weight="700">R$ 45</text>
+    <rect x="60" y="289" width="310" height="82" rx="8" fill="#fff" stroke="#e5e9e3"/>
+    <text x="76" y="311" fill="#26332c" font-size="12" font-weight="700">Pedidos de hoje</text>
+    <line x1="76" y1="326" x2="351" y2="326" stroke="#edf0eb"/>
+    <text x="76" y="346" fill="#536158" font-size="10">#012 · Ana · 2× Frango · Sem feijão</text>
+    <text x="76" y="362" fill="#536158" font-size="10">#011 · João · Retirada · Pix pendente</text>
+    <rect x="385" y="289" width="165" height="82" rx="8" fill="#f1f7f2"/>
+    <text x="401" y="313" fill="#2f7258" font-size="11" font-weight="700">+ Registrar pedido</text>
+    <text x="401" y="333" fill="#718078" font-size="9">Ação principal sempre</text><text x="401" y="347" fill="#718078" font-size="9">visível e direta.</text>
+
+    <rect x="610" y="105" width="530" height="285" rx="14" fill="#fff" stroke="#dfe5df"/>
+    <text x="630" y="135" fill="#2f7258" font-size="11" font-weight="700">02 · NOVO PEDIDO</text>
+    <text x="630" y="166" fill="#26332c" font-size="17" font-weight="700">Vamos anotar esse pedido</text>
+    <circle cx="644" cy="197" r="13" fill="#eaf4ee"/><text x="640" y="201" fill="#2f7258" font-size="10" font-weight="700">1</text>
+    <text x="666" y="201" fill="#26332c" font-size="11" font-weight="700">Cliente</text>
+    <rect x="630" y="212" width="235" height="34" rx="6" fill="#fff" stroke="#dfe5df"/>
+    <rect x="875" y="212" width="245" height="34" rx="6" fill="#fff" stroke="#dfe5df"/>
+    <text x="641" y="233" fill="#93a098" font-size="9">Nome do cliente *</text><text x="886" y="233" fill="#93a098" font-size="9">Telefone / WhatsApp *</text>
+    <circle cx="644" cy="269" r="13" fill="#eaf4ee"/><text x="640" y="273" fill="#2f7258" font-size="10" font-weight="700">2</text>
+    <text x="666" y="273" fill="#26332c" font-size="11" font-weight="700">Prato e personalizações</text>
+    <rect x="630" y="284" width="235" height="34" rx="6" fill="#fff" stroke="#dfe5df"/>
+    <rect x="875" y="284" width="100" height="34" rx="6" fill="#fff" stroke="#dfe5df"/>
+    <text x="641" y="305" fill="#536158" font-size="9">Frango grelhado · R$ 24,90</text><text x="887" y="305" fill="#536158" font-size="9">Qtd. 1</text>
+    <rect x="630" y="327" width="116" height="25" rx="5" fill="#f0f8f2"/><text x="641" y="344" fill="#2f7258" font-size="9">☑ Sem feijão</text>
+    <rect x="753" y="327" width="105" height="25" rx="5" fill="#fff" stroke="#e5e9e3"/><text x="764" y="344" fill="#718078" font-size="9">□ Sem salada</text>
+    <rect x="980" y="327" width="140" height="25" rx="5" fill="#eaf4ee"/><text x="992" y="344" fill="#2f7258" font-size="10" font-weight="700">Total R$ 24,90</text>
+    <rect x="980" y="358" width="140" height="22" rx="6" fill="#2f7258"/><text x="1008" y="373" fill="#fff" font-size="9" font-weight="700">Salvar pedido</text>
+
+    <rect x="40" y="420" width="720" height="290" rx="14" fill="#fff" stroke="#dfe5df"/>
+    <text x="60" y="450" fill="#2f7258" font-size="11" font-weight="700">03 · FILA DA COZINHA</text>
+    <text x="60" y="479" fill="#26332c" font-size="17" font-weight="700">Etapas claras, cartão por pedido</text>
+    <g>
+      <rect x="60" y="496" width="128" height="192" rx="8" fill="#eff2ed"/>
+      <rect x="198" y="496" width="128" height="192" rx="8" fill="#eff2ed"/>
+      <rect x="336" y="496" width="128" height="192" rx="8" fill="#eff2ed"/>
+      <rect x="474" y="496" width="128" height="192" rx="8" fill="#eff2ed"/>
+      <rect x="612" y="496" width="128" height="192" rx="8" fill="#eff2ed"/>
+      <text x="70" y="518" fill="#66736b" font-size="9" font-weight="700">AGUARDANDO · 2</text>
+      <text x="208" y="518" fill="#66736b" font-size="9" font-weight="700">PREPARANDO · 1</text>
+      <text x="346" y="518" fill="#66736b" font-size="9" font-weight="700">PRONTO · 1</text>
+      <text x="484" y="518" fill="#66736b" font-size="9" font-weight="700">EM ENTREGA · 1</text>
+      <text x="622" y="518" fill="#66736b" font-size="9" font-weight="700">CONCLUÍDO · 4</text>
+      <rect x="68" y="530" width="112" height="100" rx="7" fill="#fff" stroke="#e2e8e1"/>
+      <rect x="206" y="530" width="112" height="100" rx="7" fill="#fff" stroke="#e2e8e1"/>
+      <rect x="344" y="530" width="112" height="100" rx="7" fill="#fff" stroke="#e2e8e1"/>
+      <rect x="482" y="530" width="112" height="100" rx="7" fill="#fff" stroke="#e2e8e1"/>
+      <rect x="620" y="530" width="112" height="100" rx="7" fill="#fff" stroke="#e2e8e1"/>
+      <text x="77" y="548" fill="#2f7258" font-size="9" font-weight="700">#012 · Ana</text><text x="77" y="566" fill="#536158" font-size="8">2× Frango</text><text x="77" y="580" fill="#a66c3a" font-size="8">Sem feijão</text>
+      <text x="215" y="548" fill="#2f7258" font-size="9" font-weight="700">#011 · João</text><text x="215" y="566" fill="#536158" font-size="8">1× Executiva</text><text x="215" y="580" fill="#718078" font-size="8">Retirada</text>
+      <text x="353" y="548" fill="#2f7258" font-size="9" font-weight="700">#010 · Bia</text><text x="353" y="566" fill="#536158" font-size="8">1× Vegetariana</text><text x="353" y="580" fill="#718078" font-size="8">Entrega · Pix</text>
+      <text x="491" y="548" fill="#2f7258" font-size="9" font-weight="700">#009 · Rui</text><text x="491" y="566" fill="#536158" font-size="8">2× Carne</text><text x="491" y="580" fill="#718078" font-size="8">Rua das Flores</text>
+      <text x="629" y="548" fill="#2f7258" font-size="9" font-weight="700">#008 · Cris</text><text x="629" y="566" fill="#536158" font-size="8">1× Frango</text><text x="629" y="580" fill="#718078" font-size="8">Pedido finalizado</text>
+      <rect x="68" y="637" width="112" height="33" rx="6" fill="#eaf4ee"/><text x="82" y="658" fill="#2f7258" font-size="8" font-weight="700">Começar preparo →</text>
+    </g>
+
+    <rect x="790" y="420" width="350" height="290" rx="14" fill="#fff" stroke="#dfe5df"/>
+    <text x="810" y="450" fill="#2f7258" font-size="11" font-weight="700">04 · FECHAMENTO DE CAIXA</text>
+    <text x="810" y="479" fill="#26332c" font-size="17" font-weight="700">O que entrou hoje?</text>
+    <rect x="810" y="495" width="310" height="70" rx="9" fill="#347857"/>
+    <text x="827" y="516" fill="#d7e9dc" font-size="9">FATURAMENTO TOTAL</text><text x="827" y="547" fill="#fff" font-size="24" font-weight="700">R$ 320,00</text>
+    <line x1="810" y1="585" x2="1120" y2="585" stroke="#edf0eb"/>
+    <text x="817" y="607" fill="#536158" font-size="10">Recebido via Pix</text><text x="1067" y="607" fill="#26332c" font-size="10" font-weight="700">R$ 180</text>
+    <text x="817" y="630" fill="#536158" font-size="10">Recebido em dinheiro</text><text x="1067" y="630" fill="#26332c" font-size="10" font-weight="700">R$ 70</text>
+    <text x="817" y="653" fill="#536158" font-size="10">Recebido em cartão</text><text x="1067" y="653" fill="#26332c" font-size="10" font-weight="700">R$ 25</text>
+    <text x="817" y="676" fill="#a98626" font-size="10">Falta receber</text><text x="1067" y="676" fill="#a98626" font-size="10" font-weight="700">R$ 45</text>
+  </g>
+</svg>
